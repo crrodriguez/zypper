@@ -23,6 +23,7 @@
 
 #include "Config.h"
 #include "Command.h"
+#include "CommitProgress.h"
 #include "utils/getopt.h"
 #include "output/Out.h"
 
@@ -176,6 +177,8 @@ public:
   const std::string & commandHelp() const { return _command_help; }
   const ArgList & arguments() const { return _arguments; }
   RuntimeData & runtimeData() { return _rdata; }
+  CommitProgress & commitProgress() { return _commit_pg; }
+
   zypp::RepoManager & repoManager()
   { if (!_rm) _rm.reset(new zypp::RepoManager(_gopts.rm_options)); return *_rm; }
   int exitCode() const { return _exit_code; }
@@ -228,6 +231,7 @@ private:
   bool  _exit_requested;
 
   RuntimeData _rdata;
+  CommitProgress _commit_pg;
 
   RepoManager_Ptr   _rm;
 

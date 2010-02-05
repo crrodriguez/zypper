@@ -11,6 +11,7 @@ SET (zypper_HEADERS
   Zypper.h
   main.h
   Command.h
+  CommitProgress.h
   Config.h
   repos.h
   misc.h
@@ -31,6 +32,7 @@ SET (zypper_HEADERS
 SET( zypper_SRCS
   Zypper.cc
   Command.cc
+  CommitProgress.cc
   Config.cc
   repos.cc
   misc.cc
