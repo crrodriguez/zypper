@@ -79,61 +79,26 @@ namespace ZmartRecipients
       _last_reported = time(NULL);
       _last_drate_avg = -1;
 
-      Out & out = Zypper::instance()->out();
+      Zypper & zypper = *Zypper::instance();
 
-      if (out.verbosity() < Out::HIGH &&
-           (
-             // don't show download info unless show_media_progress_hack is used
-             !Zypper::instance()->runtimeData().show_media_progress_hack ||
-             // don't report download of the media file (bnc #330614)
-             zypp::Pathname(uri.getPathName()).basename() == "media"
-           )
-         )
-      {
+      // don't normally report download progress, only if --verbose
+      // downloads while committing are reported separately
+      if (zypper.out().verbosity() < Out::HIGH)
         _be_quiet = true;
-        return;
-      }
       else
         _be_quiet = false;
 
-      out.dwnldProgressStart(uri);
+      if (!zypper.commitData()._commit_running && !_be_quiet)
+        zypper.out().dwnldProgressStart(uri);
     }
 
-    //! \todo return false on SIGINT
-    virtual bool progress(int value, const zypp::Url & uri, double drate_avg, double drate_now)
-    {
-      // don't report more often than 1 second
-      time_t now = time(NULL);
-      if (now > _last_reported)
-        _last_reported = now;
-      else
-        return true;
-
-      Zypper & zypper = *(Zypper::instance());
-
-      if (zypper.exitRequested())
-      {
-        DBG << "received exit request" << std::endl;
-        return false;
-      }
-
-      if (!zypper.runtimeData().raw_refresh_progress_label.empty())
-        zypper.out().progress(
-          "raw-refresh", zypper.runtimeData().raw_refresh_progress_label);
-
-      if (_be_quiet)
-        return true;
-
-      zypper.out().dwnldProgress(uri, value, (long) drate_now);
-      _last_drate_avg = drate_avg;
-      return true;
-    }
+    virtual bool progress(int value, const zypp::Url & uri, double drate_avg, double drate_now);
 
     virtual DownloadProgressReport::Action
     problem( const zypp::Url & uri, DownloadProgressReport::Error error, const std::string & description )
     {
       DBG << "media problem" << std::endl;
-      if (_be_quiet)
+      if (!_be_quiet)
         Zypper::instance()->out().dwnldProgressEnd(uri, _last_drate_avg, true);
       Zypper::instance()->out().error(zcb_error2str(error, description));
 
@@ -145,14 +110,7 @@ namespace ZmartRecipients
     }
 
     // used only to finish, errors will be reported in media change callback (libzypp 3.20.0)
-    virtual void finish( const zypp::Url & uri, Error error, const std::string & konreason )
-    {
-      if (_be_quiet)
-        return;
-
-      Zypper::instance()->out().dwnldProgressEnd(
-          uri, _last_drate_avg, error != NO_ERROR);
-    }
+    virtual void finish( const zypp::Url & uri, Error error, const std::string & konreason );
 
   private:
     const GlobalOptions & _gopts;

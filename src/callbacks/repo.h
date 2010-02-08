@@ -17,6 +17,7 @@
 #include "zypp/Url.h"
 
 #include "Zypper.h"
+#include "CommitData.h"
 #include "utils/prompt.h"
 #include "utils/misc.h"
 
@@ -148,31 +149,32 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
     _url = url;
     Zypper & zypper = *Zypper::instance();
 
+    zypper.commitData()._last_dwnld_nr++;
+
     std::ostringstream s;
     s << boost::format(_("Retrieving %s %s-%s.%s"))
         % kind_to_string_localized(_resolvable_ptr->kind(), 1)
         % _resolvable_ptr->name()
         % _resolvable_ptr->edition() % _resolvable_ptr->arch();
 
-    s << " (" << ++zypper.runtimeData().commit_pkg_current
-      << "/" << zypper.runtimeData().commit_pkgs_total << ")";
+    s << " (" << zypper.commitData()._last_dwnld_nr
+      << "/" << zypper.commitData()._pkgs_to_get << ")";
 
-    // temporary fix for bnc #545295
-    if (zypper.runtimeData().commit_pkg_current ==
-        zypper.runtimeData().commit_pkgs_total)
-      zypper.runtimeData().commit_pkg_current = 0;
-
-// grr, bad class??
-//    zypp::ResObject::constPtr ro =
-//      dynamic_pointer_cast<const zypp::ResObject::constPtr> (resolvable_ptr);
     zypp::Package::constPtr ro = zypp::asKind<zypp::Package> (resolvable_ptr);
     if (ro) {
       s << ", " << ro->downloadSize () << " "
           // TranslatorExplanation %s is package size like "5.6 M"
           << boost::format(_("(%s unpacked)")) % ro->installSize();
     }
-    zypper.out().info(s.str());
-    zypper.runtimeData().action_rpm_download = true;
+
+    if (zypper.commitData()._commit_running)
+    {
+      zypper.commitData()._dwnld_data[ro->location().filename().basename()] =
+          CommitData::DownloadData();
+      zypper.out().commitProgress(zypper.commitData());
+    }
+    else
+      zypper.out().info(s.str());
   }
 
   // return false if the download should be aborted right now
@@ -180,8 +182,6 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
   {
     // seems this is never called, the progress is reported by the media backend anyway
     INT << "not impelmented" << std::endl;
-    // TranslatorExplanation This text is a progress display label e.g. "Retrieving [42%]"
-//    display_step( "download-resolvable", ~("Retrieving") /* + resolvable_ptr->name() */, value );
     return true;
   }
 
@@ -194,18 +194,25 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
     if (action == DownloadResolvableReport::RETRY)
       --Zypper::instance()->runtimeData().commit_pkg_current;
     else
-      Zypper::instance()->runtimeData().action_rpm_download = false;
+    {
+      zypp::Package::constPtr pkg = zypp::asKind<zypp::Package>(resolvable_ptr);
+      // TODO better mark as/move to failed
+      Zypper::instance()->commitData()._dwnld_data.erase(
+          pkg->location().filename().basename());
+    }
     return action;
   }
 
   // implementation not needed prehaps - the media backend reports the download progress
-  virtual void finish( zypp::Resolvable::constPtr /*resolvable_ptr**/, Error error, const std::string & reason )
+  virtual void finish( zypp::Resolvable::constPtr resolvable_ptr, Error error, const std::string & reason )
   {
-    Zypper::instance()->runtimeData().action_rpm_download = false;
-/*
-    display_done ("download-resolvable", cout_v);
-    display_error (error, reason);
-*/
+    Zypper & zypper = *Zypper::instance();
+    if (zypper.commitData()._commit_running)
+    {
+      zypp::Package::constPtr pkg = zypp::asKind<zypp::Package> (resolvable_ptr);
+      zypper.commitData().markDownloadDone(pkg->location().filename().basename());
+      zypper.out().commitProgress(zypper.commitData());
+    }
   }
 };
 

@@ -37,6 +37,8 @@ public:
                                 long rate = -1,
                                 bool error = false);
 
+  virtual void commitProgress(const CommitData & cd);
+
   virtual void prompt(PromptId id,
                       const std::string & prompt,
                       const PromptOptions & poptions,

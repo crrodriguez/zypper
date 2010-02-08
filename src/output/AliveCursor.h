@@ -2,7 +2,7 @@
 #ifndef ALIVE_CURSOR_H
 #define ALIVE_CURSOR_H
 
-#include <iostream>
+#include <iosfwd>
 
 // VT 100
 #define CLEARLN "\x1B[2K\r"

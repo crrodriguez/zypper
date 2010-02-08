@@ -59,6 +59,7 @@ public:
   virtual void dwnldProgressEnd(const zypp::Url & uri,
                                 long rate = -1,
                                 bool error = false);
+  virtual void commitProgress(const CommitData & cd);
 
   virtual void prompt(PromptId id,
                       const std::string & prompt,
@@ -83,6 +84,10 @@ private:
   /* Newline flag. false if the last output did not end with new line character
    * (like in a self-overwriting progress line), false otherwise. */
   bool _newline;
+  /* Number of lines to overwrite by the next output. Used when progress is
+   * printed over multiple lines.
+   */
+  unsigned short _ow_lines;
 };
 
 #endif /*OUTNORMAL_H_*/

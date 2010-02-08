@@ -8,8 +8,9 @@
 #include "zypp/Url.h"
 
 #include "utils/prompt.h"
-
 #include "output/prompt.h"
+
+struct CommitData;
 
 /**
  * Base class for producing common (for now) zypper output.
@@ -207,6 +208,9 @@ public:
   virtual void dwnldProgressEnd(const zypp::Url & uri,
                                 long rate = -1,
                                 bool error = false) = 0;
+
+  virtual void commitProgress(const CommitData & cd) = 0;
+
   //@}
 
   /**

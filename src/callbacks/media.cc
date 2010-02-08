@@ -10,6 +10,7 @@
 #include "utils/misc.h"
 #include "utils/messages.h"
 
+#include "zypp/Pathname.h"
 #include "zypp/media/MediaManager.h"
 
 using namespace zypp;
@@ -187,6 +188,8 @@ request_medium_dvd_handler(
 }
 
 // ---------------------------------------------------------------------------
+// MediaChangeReportReceiver
+// ---------------------------------------------------------------------------
 
 MediaChangeReport::Action
 ZmartRecipients::MediaChangeReportReceiver::requestMedia(
@@ -269,4 +272,71 @@ ZmartRecipients::MediaChangeReportReceiver::requestMedia(
     zypper.requestExit(false);
 
   return action;
+}
+
+// ---------------------------------------------------------------------------
+// DownloadProgressReportReceiver
+// ---------------------------------------------------------------------------
+
+//! \todo return false on SIGINT
+bool ZmartRecipients::DownloadProgressReportReceiver::progress(
+    int value, const Url & uri, double drate_avg, double drate_now)
+{
+  // don't report more often than 1 second
+  time_t now = time(NULL);
+  if (now > _last_reported)
+    _last_reported = now;
+  else
+    return true;
+
+  Zypper & zypper = *(Zypper::instance());
+
+  if (zypper.exitRequested())
+  {
+    DBG << "received exit request" << std::endl;
+    return false;
+  }
+
+  if (!zypper.runtimeData().raw_refresh_progress_label.empty())
+    zypper.out().progress(
+      "raw-refresh", zypper.runtimeData().raw_refresh_progress_label);
+
+  if (_be_quiet)
+    return true;
+
+  if (zypper.commitData()._commit_running)
+  {
+    string filename = Pathname(uri.getPathName()).basename();
+    CommitData::DownloadData & dd =
+        zypper.commitData()._dwnld_data[filename];
+    dd.percentage = value;
+    dd.speed = drate_now;
+    zypper.out().commitProgress(zypper.commitData());
+  }
+  else
+    zypper.out().dwnldProgress(uri, value, (long) drate_now);
+  _last_drate_avg = drate_avg; // TODO: get rid of this
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+
+// used only to finish, errors will be reported in media change callback (libzypp 3.20.0)
+void ZmartRecipients::DownloadProgressReportReceiver::finish(
+    const Url & uri, Error error, const string & konreason )
+{
+  if (_be_quiet)
+    return;
+
+  Zypper & zypper = *Zypper::instance();
+
+  string filename = Pathname(uri.getPathName()).basename();
+  CommitData::DownloadData & dd =
+      zypper.commitData()._dwnld_data[filename];
+  dd.percentage = 100;
+  dd.speed = _last_drate_avg;
+  // TODO: out.commitData(cp)? probably not, will be reported by repo.h
+
+  if (!zypper.commitData()._commit_running)
+    zypper.out().dwnldProgressEnd(uri, _last_drate_avg, error != NO_ERROR);
 }

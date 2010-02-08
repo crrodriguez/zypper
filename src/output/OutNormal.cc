@@ -17,6 +17,7 @@
 #include "main.h"
 #include "utils/colors.h"
 #include "AliveCursor.h"
+#include "CommitData.h"
 
 #include "OutNormal.h"
 
@@ -27,8 +28,11 @@ using std::string;
 using std::ostringstream;
 
 OutNormal::OutNormal(Verbosity verbosity)
-  : Out(TYPE_NORMAL, verbosity),
-    _use_colors(false), _isatty(isatty(STDOUT_FILENO)), _newline(true)
+  : Out(TYPE_NORMAL, verbosity)
+  , _use_colors (false)
+  , _isatty     (isatty(STDOUT_FILENO))
+  , _newline    (true)
+  , _ow_lines   (0)
 {}
 
 OutNormal::~OutNormal()
@@ -301,6 +305,39 @@ void OutNormal::dwnldProgressEnd(const zypp::Url & uri, long rate, bool error)
   cout << endl << std::flush;
   _newline = true;
 }
+
+static string cursor_up(unsigned lines)
+{ return zypp::str::form("\x1B[%dA\r\x1B[J", lines); }
+
+void OutNormal::commitProgress(const CommitData & cd)
+{
+//  cd.dumpTo(cout);
+//  return;
+
+  // move the cursor up to update variable status lines
+  // clear the rest of the screen
+  if (_ow_lines)
+    cout << cursor_up(_ow_lines);
+
+  // write recently finished
+  for_(dd, cd._dwnld_data_done.begin(), cd._dwnld_data_done.end())
+  {
+    cout << "Retrieved " << dd->first
+        << "[" << dd->second.speed << "/s]" << endl;
+  }
+
+  // write currently processed
+  _ow_lines = 0;
+  for_(dd, cd._dwnld_data.begin(), cd._dwnld_data.end())
+  {
+    cout << "Retrieving " << dd->first
+        << " [" << dd->second.percentage << "% (" << dd->second.speed << "/s)]" << endl;
+    ++_ow_lines;
+  }
+
+  // write overall progress
+}
+
 
 void OutNormal::prompt(PromptId id,
                        const string & prompt,

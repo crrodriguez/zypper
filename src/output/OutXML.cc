@@ -186,6 +186,11 @@ void OutXML::dwnldProgressEnd(const zypp::Url & uri, long rate, bool error)
     << "/>" << endl;
 }
 
+void OutXML::commitProgress(const CommitData & cd)
+{
+  //! \todo implementation
+}
+
 void OutXML::prompt(PromptId id,
                     const string & prompt,
                     const PromptOptions & poptions,

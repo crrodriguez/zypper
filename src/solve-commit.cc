@@ -702,12 +702,17 @@ void solve_and_commit (Zypper & zypper)
 
         try
         {
-          RuntimeData & gData = Zypper::instance()->runtimeData();
-          gData.show_media_progress_hack = true;
+          RuntimeData & gData = zypper.runtimeData();
+
           // Total packages to download & install.
           // To be used to write overall progress.
           gData.commit_pkgs_total = summary.packagesToGetAndInstall();
           gData.commit_pkg_current = 0;
+
+          zypper.commitData().reset(
+              summary.packagesToGetAndInstall(), 0,
+              summary.packagesToGetAndInstall());
+          zypper.commitData().setCommitRunning();
 
           ostringstream s;
           s << _("committing"); MIL << "committing...";
@@ -717,10 +722,9 @@ void solve_and_commit (Zypper & zypper)
 
           ZYppCommitResult result = God->commit(get_commit_policy(zypper));
           commit_done = true;
+          zypper.commitData().setCommitRunning(false);
 
           MIL << endl << "DONE" << endl;
-
-          gData.show_media_progress_hack = false;
 
           if (!result._errors.empty())
             zypper.setExitCode(ZYPPER_EXIT_ERR_ZYPP);

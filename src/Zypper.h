@@ -23,7 +23,7 @@
 
 #include "Config.h"
 #include "Command.h"
-#include "CommitProgress.h"
+#include "CommitData.h"
 #include "utils/getopt.h"
 #include "output/Out.h"
 
@@ -99,7 +99,6 @@ struct RuntimeData
 {
   RuntimeData()
     : patches_count(0), security_patches_count(0)
-    , show_media_progress_hack(false)
     , force_resolution(zypp::indeterminate)
     , solve_before_commit(true)
     , commit_pkgs_total(0)
@@ -120,10 +119,6 @@ struct RuntimeData
   zypp::RepoInfo current_repo;
 
   std::list<zypp::SrcPackage::constPtr> srcpkgs_to_install;
-
-  // hack to enable media progress reporting in the commit phase in normal
-  // output level
-  bool show_media_progress_hack;
 
   // Indicates an ongoing raw meta-data refresh.
   // If not empty call zypper.out().progress(
@@ -177,7 +172,7 @@ public:
   const std::string & commandHelp() const { return _command_help; }
   const ArgList & arguments() const { return _arguments; }
   RuntimeData & runtimeData() { return _rdata; }
-  CommitProgress & commitProgress() { return _commit_pg; }
+  CommitData & commitData() { return _commit_pg; }
 
   zypp::RepoManager & repoManager()
   { if (!_rm) _rm.reset(new zypp::RepoManager(_gopts.rm_options)); return *_rm; }
@@ -231,7 +226,7 @@ private:
   bool  _exit_requested;
 
   RuntimeData _rdata;
-  CommitProgress _commit_pg;
+  CommitData _commit_pg;
 
   RepoManager_Ptr   _rm;
 
