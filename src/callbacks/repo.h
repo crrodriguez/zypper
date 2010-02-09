@@ -170,7 +170,7 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
     if (zypper.commitData()._commit_running)
     {
       zypper.commitData()._dwnld_data[ro->location().filename().basename()] =
-          CommitData::DownloadData();
+          CommitData::PkgDownloadData();
       zypper.out().commitProgress(zypper.commitData());
     }
     else
@@ -212,6 +212,7 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
       zypp::Package::constPtr pkg = zypp::asKind<zypp::Package> (resolvable_ptr);
       zypper.commitData().markDownloadDone(pkg->location().filename().basename());
       zypper.out().commitProgress(zypper.commitData());
+      zypper.commitData()._dwnld_data_done.clear();
     }
   }
 };

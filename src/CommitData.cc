@@ -32,7 +32,7 @@ void CommitData::reset(
   _dwnld_data.clear();
   _dwnld_data_done.clear();
   _last_dwnld_nr    = 0;
-  _inst_nr          = 0;
+  _last_inst_nr     = 0;
 }
 
 void CommitData::markDownloadDone(
@@ -56,7 +56,7 @@ void CommitData::dumpTo(ostream & out) const
 {
   out << "--- CommitData start ---" << endl;
   out << "total:   " << _pkgs_to_get << "/" << _pkgs_to_install << endl;
-  out << "current: " << _last_dwnld_nr << "/" << _inst_nr << endl;
+  out << "current: " << _last_dwnld_nr << "/" << _last_inst_nr << endl;
   out << "getting: " << _dwnld_data.size() << endl;
   for_(it, _dwnld_data.begin(), _dwnld_data.end())
     out << "  " << it->first << " [" << it->second.percentage << "%]" << endl;

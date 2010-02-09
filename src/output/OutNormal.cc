@@ -319,19 +319,45 @@ void OutNormal::commitProgress(const CommitData & cd)
   if (_ow_lines)
     cout << cursor_up(_ow_lines);
 
-  // write recently finished
+  // recently finished
+
+  // downloads
+
   for_(dd, cd._dwnld_data_done.begin(), cd._dwnld_data_done.end())
   {
     cout << "Retrieved " << dd->first
         << "[" << dd->second.speed << "/s]" << endl;
   }
 
-  // write currently processed
+  // installs
+
+  if (!cd._inst_done.empty())
+  {
+    cout << zypp::str::form(_("Installed %s-%s"),
+        cd._inst_done.pkg->name().c_str(), cd._inst_done.pkg->edition().c_str()) << endl;
+    if (!cd._inst_done.info_msg.empty())
+      cout << cd._inst_done.info_msg << endl;
+  }
+
+  // currently processed
+
+  // downloads
+
   _ow_lines = 0;
   for_(dd, cd._dwnld_data.begin(), cd._dwnld_data.end())
   {
     cout << "Retrieving " << dd->first
         << " [" << dd->second.percentage << "% (" << dd->second.speed << "/s)]" << endl;
+    ++_ow_lines;
+  }
+
+  // install
+
+  if (!cd._inst.empty())
+  {
+    // translators: this is a progress display label e.g. "Installing foo-1.1.2 [42%]"
+    cout << zypp::str::form(_("Installing: %s-%s"),
+        cd._inst.pkg->name().c_str(), cd._inst.pkg->edition().c_str()) << endl;
     ++_ow_lines;
   }
 

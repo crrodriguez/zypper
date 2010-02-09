@@ -307,7 +307,7 @@ bool ZmartRecipients::DownloadProgressReportReceiver::progress(
   if (zypper.commitData()._commit_running)
   {
     string filename = Pathname(uri.getPathName()).basename();
-    CommitData::DownloadData & dd =
+    CommitData::PkgDownloadData & dd =
         zypper.commitData()._dwnld_data[filename];
     dd.percentage = value;
     dd.speed = drate_now;
@@ -331,7 +331,7 @@ void ZmartRecipients::DownloadProgressReportReceiver::finish(
   Zypper & zypper = *Zypper::instance();
 
   string filename = Pathname(uri.getPathName()).basename();
-  CommitData::DownloadData & dd =
+  CommitData::PkgDownloadData & dd =
       zypper.commitData()._dwnld_data[filename];
   dd.percentage = 100;
   dd.speed = _last_drate_avg;

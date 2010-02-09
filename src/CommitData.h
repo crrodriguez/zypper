@@ -18,20 +18,37 @@
 #include <iosfwd>
 
 #include "zypp/ByteCount.h"
+#include "zypp/Package.h"
 
 struct CommitData
 {
-  struct DownloadData
+  struct PkgProgressData
   {
-    DownloadData() : speed(0), percentage(0) {}
+    PkgProgressData() : seq_number(0), percentage(0) {}
+    bool empty() const { return !seq_number; }
+    bool done()  const { return percentage == 100; }
+
+    zypp::Package::constPtr pkg;
     //! Number of the package in the commit sequence.
     unsigned seq_number;
-    //! Current (and final) download speed.
-    zypp::ByteCount speed;
     //! Download progress percentage.
     int percentage;
+    std::string error_msg;
+    //! e.g. for additional rpm output
+    std::string info_msg;
   };
 
+  struct PkgDownloadData : PkgProgressData
+  {
+    PkgDownloadData() : speed(0), avg_speed(0)  {}
+    //! Current download speed.
+    zypp::ByteCount speed;
+    //! Current (and final) average download speed.
+    zypp::ByteCount avg_speed;
+  };
+
+
+  // --------------------------------------------------------------------------
 
   CommitData() : _commit_running(false) { reset(0, 0, 0); }
 
@@ -58,6 +75,8 @@ struct CommitData
 
   void dumpTo(std::ostream & out) const;
 
+  // --------------------------------------------------------------------------
+
   bool _commit_running;
 
   // *** Commit constants
@@ -81,19 +100,21 @@ struct CommitData
 
   // *** Individual action progress
 
-  //! Numbers of packages being currently retrieved (can retrieve multiple
+  //! Filenames of packages being currently retrieved (can retrieve multiple
   //! simultaneously) and their respective download data.
-  std::map<std::string, DownloadData> _dwnld_data;
-  //! Numbers of packages being currently retrieved (can retrieve multiple
+  std::map<std::string, PkgDownloadData> _dwnld_data;
+  //! Filenames of packages being currently retrieved (can retrieve multiple
   //! simultaneously) and their respective download data.
-  std::map<std::string, DownloadData> _dwnld_data_done;
+  std::map<std::string, PkgDownloadData> _dwnld_data_done;
   //! The last package number that started downloading.
   unsigned _last_dwnld_nr;
 
-  //! Number of the package being currently installed.
-  unsigned _inst_nr;
-  //! Progress of installation of current package.
-  int _inst_percent;
+  //! Data of the package being installed
+  PkgProgressData _inst;
+  //! Data of the last package which was installed
+  PkgProgressData _inst_done;
+  //! The last package number that started installing
+  unsigned _last_inst_nr;
 };
 
 

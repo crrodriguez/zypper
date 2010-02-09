@@ -189,22 +189,21 @@ std::ostream & operator << (std::ostream & stm,
 // progress for installing a resolvable
 struct InstallResolvableReportReceiver : public zypp::callback::ReceiveReport<zypp::target::rpm::InstallResolvableReport>
 {
-  zypp::Resolvable::constPtr _resolvable;
   std::string _label;
   timespec _last_reported;
-
-  void display_step( zypp::Resolvable::constPtr resolvable, int value )
-  {
-  }
 
   virtual void start( zypp::Resolvable::constPtr resolvable )
   {
     clock_gettime(CLOCK_REALTIME, &_last_reported);
-    _resolvable = resolvable;
-    // TranslatorExplanation This text is a progress display label e.g. "Installing foo-1.1.2 [42%]"
-    _label = boost::str(boost::format(_("Installing: %s-%s"))
-        % resolvable->name() % resolvable->edition());
-    Zypper::instance()->out().progressStart("install-resolvable", _label);
+
+    Zypper & zypper = *Zypper::instance();
+
+    CommitData & cd = zypper.commitData();
+    cd._inst.pkg = zypp::asKind<zypp::Package>(resolvable);
+    cd._inst.percentage = 0;
+    cd._inst.seq_number = ++cd._last_inst_nr;
+
+    zypper.out().commitProgress(cd);
   }
 
   virtual bool progress(int value, zypp::Resolvable::constPtr resolvable)
@@ -213,7 +212,12 @@ struct InstallResolvableReportReceiver : public zypp::callback::ReceiveReport<zy
     if (!report_again(&_last_reported))
       return true;
 
-    Zypper::instance()->out().progress("install-resolvable", _label, value);
+    Zypper & zypper = *Zypper::instance();
+
+    zypper.commitData()._inst.percentage = value;
+    zypper.out().commitProgress(zypper.commitData());
+
+//    Zypper::instance()->out().progress("install-resolvable", _label, value);
     return true;
   }
 
@@ -249,12 +253,22 @@ struct InstallResolvableReportReceiver : public zypp::callback::ReceiveReport<zy
       Zypper::instance()->setExitCode(ZYPPER_EXIT_ERR_ZYPP);
     else
     {
-      Zypper::instance()->out().progressEnd("install-resolvable", _label);
+      Zypper & zypper = *Zypper::instance();
 
-      // print additional rpm output
-      // bnc #369450
+      CommitData & cd = zypper.commitData();
+      cd._inst.percentage = 100;
+      // additional rpm output (bnc #369450)
       if (!reason.empty())
-        Zypper::instance()->out().info(reason);
+        cd._inst.info_msg = reason;
+
+      cd._inst_done = cd._inst;
+      cd._inst = CommitData::PkgProgressData();
+
+      zypper.out().commitProgress(cd);
+
+      cd._inst_done = CommitData::PkgProgressData();
+
+      // Zypper::instance()->out().progressEnd("install-resolvable", _label);
     }
   }
 };
