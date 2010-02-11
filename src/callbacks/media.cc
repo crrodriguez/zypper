@@ -289,7 +289,7 @@ bool ZmartRecipients::DownloadProgressReportReceiver::progress(
   else
     return true;
 
-  Zypper & zypper = *(Zypper::instance());
+  Zypper & zypper = *Zypper::instance();
 
   if (zypper.exitRequested())
   {
@@ -301,18 +301,38 @@ bool ZmartRecipients::DownloadProgressReportReceiver::progress(
     zypper.out().progress(
       "raw-refresh", zypper.runtimeData().raw_refresh_progress_label);
 
-  if (_be_quiet)
-    return true;
-
-  if (zypper.commitData()._commit_running)
+  CommitData & cd = zypper.commitData();
+  if (cd._commit_running)
   {
     string filename = Pathname(uri.getPathName()).basename();
-    CommitData::PkgDownloadData & dd =
-        zypper.commitData()._dwnld_data[filename];
-    dd.percentage = value;
-    dd.speed = drate_now;
+    if (filename == "media")
+      return true;
+    if (filename.find("delta") != string::npos)
+    {
+      for_(it, cd._dwnld_data.begin(), cd._dwnld_data.end())
+        if (it->second.delta_filename == filename)
+        {
+          it->second.delta_dwnld_pg = value;
+          it->second.speed = drate_now;
+          break;
+        }
+    }
+    else if (filename.find("patch") != string::npos)
+    {
+
+    }
+    else
+    {
+      CommitData::PkgDownloadData & dd =
+          cd._dwnld_data[filename];
+      dd.percentage = value;
+      dd.speed = drate_now;
+    }
+
     zypper.out().commitProgress(zypper.commitData());
   }
+  else if (_no_default_report)
+    return true;
   else
     zypper.out().dwnldProgress(uri, value, (long) drate_now);
   _last_drate_avg = drate_avg; // TODO: get rid of this
@@ -325,18 +345,32 @@ bool ZmartRecipients::DownloadProgressReportReceiver::progress(
 void ZmartRecipients::DownloadProgressReportReceiver::finish(
     const Url & uri, Error error, const string & konreason )
 {
-  if (_be_quiet)
-    return;
-
   Zypper & zypper = *Zypper::instance();
+  CommitData & cd = zypper.commitData();
 
   string filename = Pathname(uri.getPathName()).basename();
-  CommitData::PkgDownloadData & dd =
-      zypper.commitData()._dwnld_data[filename];
-  dd.percentage = 100;
-  dd.speed = _last_drate_avg;
-  // TODO: out.commitData(cp)? probably not, will be reported by repo.h
+  if (filename == "media")
+    return;
+  else if (filename.find("delta") != string::npos)
+  {
+    for_(it, cd._dwnld_data.begin(), cd._dwnld_data.end())
+      if (it->second.delta_filename == filename)
+      {
+        it->second.delta_dwnld_pg = 100;
+        it->second.speed = _last_drate_avg;
+        break;
+      }
+  }
+  else
+  {
+    CommitData::PkgDownloadData & dd = cd._dwnld_data[filename];
+    dd.percentage = 100;
+    dd.speed = _last_drate_avg;
+  }
 
-  if (!zypper.commitData()._commit_running)
+  // no out.commitData(), will be called by repo.h
+
+  // normal progress report if not in commit
+  if (!_no_default_report)
     zypper.out().dwnldProgressEnd(uri, _last_drate_avg, error != NO_ERROR);
 }

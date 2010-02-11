@@ -71,7 +71,7 @@ namespace ZmartRecipients
     : public zypp::callback::ReceiveReport<zypp::media::DownloadProgressReport>
   {
     DownloadProgressReportReceiver()
-      : _gopts(Zypper::instance()->globalOpts()), _be_quiet(false)
+      : _gopts(Zypper::instance()->globalOpts()), _no_default_report(false)
     {}
 
     virtual void start( const zypp::Url & uri, zypp::Pathname localfile )
@@ -83,13 +83,20 @@ namespace ZmartRecipients
 
       // don't normally report download progress, only if --verbose
       // downloads while committing are reported separately
-      if (zypper.out().verbosity() < Out::HIGH)
-        _be_quiet = true;
+      if (zypper.commitData()._commit_running ||
+          zypper.out().verbosity() < Out::HIGH || // TODO && refresh_running
+          // don't report download of the media file (bnc #330614)
+          zypp::Pathname(uri.getPathName()).basename() == "media"
+         )
+      {
+        _no_default_report = true;
+        return;
+      }
       else
-        _be_quiet = false;
-
-      if (!zypper.commitData()._commit_running && !_be_quiet)
+      {
+        _no_default_report = false;
         zypper.out().dwnldProgressStart(uri);
+      }
     }
 
     virtual bool progress(int value, const zypp::Url & uri, double drate_avg, double drate_now);
@@ -98,7 +105,7 @@ namespace ZmartRecipients
     problem( const zypp::Url & uri, DownloadProgressReport::Error error, const std::string & description )
     {
       DBG << "media problem" << std::endl;
-      if (!_be_quiet)
+      if (!_no_default_report)
         Zypper::instance()->out().dwnldProgressEnd(uri, _last_drate_avg, true);
       Zypper::instance()->out().error(zcb_error2str(error, description));
 
@@ -114,7 +121,7 @@ namespace ZmartRecipients
 
   private:
     const GlobalOptions & _gopts;
-    bool _be_quiet;
+    bool _no_default_report;
     time_t _last_reported;
     double _last_drate_avg;
   };

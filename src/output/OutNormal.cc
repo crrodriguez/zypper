@@ -13,6 +13,7 @@
 #include "zypp/Pathname.h"
 #include "zypp/ByteCount.h" // for download progress reporting
 #include "zypp/base/String.h" // for toUpper()
+#include "zypp/base/Logger.h" // for toUpper()
 
 #include "main.h"
 #include "utils/colors.h"
@@ -26,6 +27,8 @@ using std::cerr;
 using std::endl;
 using std::string;
 using std::ostringstream;
+
+using namespace zypp::str;
 
 OutNormal::OutNormal(Verbosity verbosity)
   : Out(TYPE_NORMAL, verbosity)
@@ -311,22 +314,25 @@ static string cursor_up(unsigned lines)
 
 void OutNormal::commitProgress(const CommitData & cd)
 {
-//  cd.dumpTo(cout);
-//  return;
+  cd.dumpTo(INT);
 
   // move the cursor up to update variable status lines
   // clear the rest of the screen
   if (_ow_lines)
-    cout << cursor_up(_ow_lines);
+    cout << cursor_up(_ow_lines) << CLEARLN;
+  // cout << endl << "       < - - - - - - - - " << endl;
 
-  // recently finished
+  // *** recently finished ***
 
   // downloads
 
   for_(dd, cd._dwnld_data_done.begin(), cd._dwnld_data_done.end())
   {
-    cout << "Retrieved " << dd->first
-        << "[" << dd->second.speed << "/s]" << endl;
+    cout << "Retrieved " << dd->first;
+    if (dd->second.speed > 0)
+      cout << " [" << dd->second.speed << "/s]";
+    cout << endl;
+    // todo special info in case of delta rpm
   }
 
   // installs
@@ -339,15 +345,28 @@ void OutNormal::commitProgress(const CommitData & cd)
       cout << cd._inst_done.info_msg << endl;
   }
 
-  // currently processed
+  // *** currently processed ***
 
   // downloads
 
   _ow_lines = 0;
   for_(dd, cd._dwnld_data.begin(), cd._dwnld_data.end())
   {
-    cout << "Retrieving " << dd->first
-        << " [" << dd->second.percentage << "% (" << dd->second.speed << "/s)]" << endl;
+    if (dd->second.hasDelta() && dd->second.delta_dwnld_pg != 100)
+    {
+      cout << "Retrieving " << dd->second.delta_filename
+          << " [" << dd->second.delta_dwnld_pg << "% (" << dd->second.speed << "/s)]" << endl;
+    }
+    else if (dd->second.delta_dwnld_pg != 100 && dd->second.delta_dwnld_pg != -1)
+    {
+      cout << "Applying " << dd->second.delta_filename
+          << " [" << dd->second.delta_apply_pg << "%]" << endl;
+    }
+    else
+    {
+      cout << "Retrieving " << dd->first
+          << " [" << dd->second.percentage << "% (" << dd->second.speed << "/s)]" << endl;
+    }
     ++_ow_lines;
   }
 
@@ -362,6 +381,44 @@ void OutNormal::commitProgress(const CommitData & cd)
   }
 
   // write overall progress
+  //
+  // retrieving 1 of 10                          1% ETA -:--
+  // retrieving 2,3 of 5; installing 1 of 10    10% ETA 1:02
+  // installing 10 of 10                        99% ETA 0:01
+
+  string overall;
+  if (!cd._dwnld_data.empty())
+  {
+    ostringstream sstr;
+    std::map<string, CommitData::PkgDownloadData>::const_iterator it =
+        cd._dwnld_data.begin();
+    sstr << it->second.seq_number;
+    for (++it; it != cd._dwnld_data.end(); ++it)
+      sstr << "," << it->second.seq_number;
+
+    // retrieving 1 of 10                          1% ETA -:--
+    if (cd._inst.empty())
+    {
+      overall = form(_("Retrieving %s of %d"),
+          sstr.str().c_str(), cd._pkgs_to_get);
+    }
+    // retrieving 2,3 of 5; installing 1 of 10    10% ETA 1:02
+    else
+    {
+      overall = form(_("Retrieving %s of %d; installing %d of %d"),
+          sstr.str().c_str(), cd._pkgs_to_get, cd._inst.seq_number, cd._pkgs_to_install);
+    }
+  }
+  // installing 10 of 10                        99% ETA 0:01
+  else if (!cd._inst.empty())
+  {
+    overall = form(_("Installing %d of %d"),
+        cd._inst.seq_number, cd._pkgs_to_install);
+  }
+
+  if (!overall.empty())
+    cout << overall << " 0% ETA -:--" << std::flush;
+  _newline = false;
 }
 
 

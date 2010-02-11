@@ -40,11 +40,24 @@ struct CommitData
 
   struct PkgDownloadData : PkgProgressData
   {
-    PkgDownloadData() : speed(0), avg_speed(0)  {}
+    PkgDownloadData() :
+      speed(0), avg_speed(0), delta_dwnld_pg(-1), delta_apply_pg(-1)
+    {}
+
+    bool hasDelta() const
+    { return delta_dwnld_pg >= 0 && !delta_filename.empty(); }
+
+    //! Amount of bytes to get.
+    zypp::ByteCount size;
     //! Current download speed.
     zypp::ByteCount speed;
     //! Current (and final) average download speed.
     zypp::ByteCount avg_speed;
+
+    std::string delta_filename;
+    zypp::ByteCount delta_size;
+    int delta_dwnld_pg;
+    int delta_apply_pg;
   };
 
 

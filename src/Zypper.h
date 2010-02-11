@@ -172,7 +172,7 @@ public:
   const std::string & commandHelp() const { return _command_help; }
   const ArgList & arguments() const { return _arguments; }
   RuntimeData & runtimeData() { return _rdata; }
-  CommitData & commitData() { return _commit_pg; }
+  CommitData & commitData() { return _commit_data; }
 
   zypp::RepoManager & repoManager()
   { if (!_rm) _rm.reset(new zypp::RepoManager(_gopts.rm_options)); return *_rm; }
@@ -226,7 +226,7 @@ private:
   bool  _exit_requested;
 
   RuntimeData _rdata;
-  CommitData _commit_pg;
+  CommitData _commit_data;
 
   RepoManager_Ptr   _rm;
 

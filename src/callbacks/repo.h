@@ -29,11 +29,8 @@ namespace ZmartRecipients
 // progress for downloading a resolvable
 struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<zypp::repo::DownloadResolvableReport>
 {
-  zypp::Resolvable::constPtr _resolvable_ptr;
+  zypp::Package::constPtr _pkg_ptr;
   zypp::Url _url;
-  zypp::Pathname _delta;
-  zypp::ByteCount _delta_size;
-  std::string _label_apply_delta;
   zypp::Pathname _patch;
   zypp::ByteCount _patch_size;
 
@@ -42,37 +39,40 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
   // - expected download size (0 if unknown)
   // - download is interruptable
   // - problems are just informal
-  virtual void startDeltaDownload( const zypp::Pathname & filename, const zypp::ByteCount & downloadsize )
+  virtual void startDeltaDownload(
+      const zypp::Pathname & filename, const zypp::ByteCount & downloadsize)
   {
+    Zypper & zypper = *Zypper::instance();
+
+    CommitData::PkgDownloadData & dd = zypper.commitData()
+        ._dwnld_data[_pkg_ptr->location().filename().basename()];
+
+    dd.delta_dwnld_pg = 0;
+    dd.delta_filename = filename.basename();
+    dd.delta_size = downloadsize;
+
+    zypper.out().commitProgress(zypper.commitData());
+
+    /*
     _delta = filename;
     _delta_size = downloadsize;
     std::ostringstream s;
     s << _("Retrieving delta") << ": "
         << _delta << ", " << _delta_size;
     Zypper::instance()->out().info(s.str());
+    */
   }
 
-  virtual bool progressDeltaDownload( int value )
-  {
-    // seems this is never called, the progress is reported by the media backend anyway
-    INT << "not impelmented" << std::endl;
-    // TranslatorExplanation This text is a progress display label e.g. "Retrieving delta [42%]"
-    //display_step( "apply-delta", ~("Retrieving delta") /*+ _delta.asString()*/, value );
-    return true;
-  }
+  // implementation not needed, the progress is reported by the media backend
+  // virtual bool progressDeltaDownload( int value )
 
   virtual void problemDeltaDownload( const std::string & description )
   {
     Zypper::instance()->out().error(description);
   }
 
-  // implementation not needed prehaps - the media backend reports the download progress
-  /*
-  virtual void finishDeltaDownload()
-  {
-    display_done ("download-resolvable", cout_v);
-  }
-  */
+  // implementation not needed, the media backend reports the download progress
+  // virtual void finishDeltaDownload()
 
   // Apply delta rpm:
   // - local path of downloaded delta
@@ -80,31 +80,40 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
   // - problems are just informal
   virtual void startDeltaApply( const zypp::Pathname & filename )
   {
-    _delta = filename.basename();
-    std::ostringstream s;
+    Zypper & zypper = *Zypper::instance();
+    zypper.commitData()._dwnld_data[_pkg_ptr->location().filename().basename()].delta_apply_pg = 0;
+    zypper.out().commitProgress(zypper.commitData());
+
+    // std::ostringstream s;
     // translators: this text is a progress display label e.g. "Applying delta foo [42%]"
-    s << _("Applying delta") << ": " << _delta;
-    _label_apply_delta = s.str();
-    Zypper::instance()->out().progressStart("apply-delta", _label_apply_delta, false);
+    // s << _("Applying delta") << ": " << _delta;
+    // _label_apply_delta = s.str();
+    // Zypper::instance()->out().progressStart("apply-delta", _label_apply_delta, false);
   }
 
   virtual void progressDeltaApply( int value )
   {
-    Zypper::instance()->out().progress("apply-delta", _label_apply_delta, value);
+    Zypper & zypper = *Zypper::instance();
+    zypper.commitData()._dwnld_data[_pkg_ptr->location().filename().basename()].delta_apply_pg = value;
+    zypper.out().commitProgress(zypper.commitData());
+    // Zypper::instance()->out().progress("apply-delta", _label_apply_delta, value);
   }
 
   virtual void problemDeltaApply( const std::string & description )
   {
-    Zypper::instance()->out().progressEnd("apply-delta", _label_apply_delta, true);
-    Zypper::instance()->out().error(description);
+    // Zypper::instance()->out().progressEnd("apply-delta", _label_apply_delta, true);
+    // Zypper::instance()->out().error(description);
   }
 
   virtual void finishDeltaApply()
   {
-    Zypper::instance()->out().progressEnd("apply-delta", _label_apply_delta);
+    Zypper & zypper = *Zypper::instance();
+    zypper.commitData()._dwnld_data[_pkg_ptr->location().filename().basename()].delta_apply_pg = 100;
+    zypper.out().commitProgress(zypper.commitData());
+    // Zypper::instance()->out().progressEnd("apply-delta", _label_apply_delta);
   }
 
-  // Dowmload patch rpm:
+  // Download patch rpm:
   // - path below url reported on start()
   // - expected download size (0 if unknown)
   // - download is interruptable
@@ -145,33 +154,32 @@ struct DownloadResolvableReportReceiver : public zypp::callback::ReceiveReport<z
    */
   virtual void start( zypp::Resolvable::constPtr resolvable_ptr, const zypp::Url & url )
   {
-    _resolvable_ptr =  resolvable_ptr;
+    zypp::Package::constPtr pkg = zypp::asKind<zypp::Package> (resolvable_ptr);
+    _pkg_ptr =  pkg;
     _url = url;
     Zypper & zypper = *Zypper::instance();
+    CommitData & cd = zypper.commitData();
 
-    zypper.commitData()._last_dwnld_nr++;
+    ++cd._last_dwnld_nr;
 
     std::ostringstream s;
     s << boost::format(_("Retrieving %s %s-%s.%s"))
-        % kind_to_string_localized(_resolvable_ptr->kind(), 1)
-        % _resolvable_ptr->name()
-        % _resolvable_ptr->edition() % _resolvable_ptr->arch();
+        % kind_to_string_localized(_pkg_ptr->kind(), 1)
+        % _pkg_ptr->name()
+        % _pkg_ptr->edition() % _pkg_ptr->arch();
 
-    s << " (" << zypper.commitData()._last_dwnld_nr
-      << "/" << zypper.commitData()._pkgs_to_get << ")";
+    s << " (" << cd._last_dwnld_nr << "/" << cd._pkgs_to_get << ")";
 
-    zypp::Package::constPtr ro = zypp::asKind<zypp::Package> (resolvable_ptr);
-    if (ro) {
-      s << ", " << ro->downloadSize () << " "
-          // TranslatorExplanation %s is package size like "5.6 M"
-          << boost::format(_("(%s unpacked)")) % ro->installSize();
-    }
+    s << ", " << _pkg_ptr->downloadSize () << " "
+      // TranslatorExplanation %s is package size like "5.6 M"
+      << boost::format(_("(%s unpacked)")) % _pkg_ptr->installSize();
 
-    if (zypper.commitData()._commit_running)
+    if (cd._commit_running)
     {
-      zypper.commitData()._dwnld_data[ro->location().filename().basename()] =
-          CommitData::PkgDownloadData();
-      zypper.out().commitProgress(zypper.commitData());
+      CommitData::PkgDownloadData dd;
+      dd.seq_number = cd._last_dwnld_nr;
+      cd._dwnld_data[_pkg_ptr->location().filename().basename()] = dd;
+      zypper.out().commitProgress(cd);
     }
     else
       zypper.out().info(s.str());
