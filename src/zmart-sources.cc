@@ -154,13 +154,7 @@ void list_system_sources()
 
   try
   {
-#ifdef LIBZYPP_1xx
     sources = SourceManager::sourceManager()->knownSourceInfos (gSettings.root_dir);
-#else
-    zypp::storage::PersistentStorage store;
-    store.init( gSettings.root_dir );
-    sources = store.storedSources();
-#endif
   }
   catch ( const Exception &e )
   {
