@@ -10,7 +10,7 @@
 
 #include <zypp/target/store/PersistentStorage.h>
 #include <zypp/base/IOStream.h>
-
+#include <zypp/base/Regex.h>
 
 using namespace zypp::detail;
 
@@ -173,29 +173,29 @@ void list_system_sources()
 
 bool parse_repo_file (const string& file, string& url, string& alias)
 {
-  static const boost::regex
+  static const str::regex
     r_alias ("^\\[(.*)\\]$"),
     r_type ("^type=(.*)"),
     r_url ("^baseurl=(.*)");
-  boost::smatch match;
+  str::smatch match;
 
   std::ifstream repo(file.c_str());
   bool have_alias = false, have_url = false;
   while (repo.good ()) {
     string line = zypp::iostr::getline (repo);
 
-    if (regex_search (line, match, r_alias)) {
+    if (regex_match (line.c_str(), match, r_alias)) {
       alias = match[1];
       have_alias = true;
     }
-    else if (regex_search (line, match, r_type)) {
+    else if (regex_match (line.c_str(), match, r_type)) {
       string type = match[1];
       if (type != "rpm-md" && type != "yast2") {
 	cerr << _("Unknown repository type ") << type << endl;
 	return false;
       }
     }
-    else if (regex_search (line, match, r_url)) {
+    else if (regex_match (line.c_str(), match, r_url)) {
       url = match[1];
       have_url = true;
     }
